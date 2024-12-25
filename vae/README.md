@@ -23,14 +23,14 @@
 Suppose there are `N` samples $X = (x^1, x^2, x^3, ..., x^N)$ from a data distribution. Our goal is to **maximize the likelihood** of observing this data, which is denoted as $P_\theta(X)$.
 
 
-$$
+```math
 \begin{align*}
 \mathop{\arg\max}\limits_{\theta} \log P_\theta(X) 
 &= \mathop{\arg\max}\limits_{\theta} \log \left[ P_\theta(x^1)P_\theta(x^2)P_\theta(x^3)...P_\theta(x^N) \right] \\
 &= \mathop{\arg\max}\limits_{\theta} \log \prod_{i=1}^{N} P_\theta(x^i) \\
 &= \mathop{\arg\max}\limits_{\theta} \sum_{i=1}^{N} \log P_\theta(x^i)  \\
 \end{align*}
-$$
+```
 
 Hence our goal is $\mathop{\arg\max}\limits_{\theta} \log P_\theta(x^i)$ , $P_\theta(x^i)$ is noted as $p(x)$ below.
 
@@ -46,7 +46,7 @@ graph TB;
 ```
 
 
-$$
+```math
 \begin{align*}
 \log p(x) &= \log \frac{ p(x,z) }{ p(z|x) } \\
  \log p(x) q(z|x) &= \log \frac{ p(x,z) }{ p(z|x) }  q(z|x) \\
@@ -60,38 +60,34 @@ $$
 \log p(x) &= \int\limits_{z}  \log  \frac{p(x,z)}{q(z|x)} q(z|x)dz + D_{KL} \left[q(z|x) | p(z|x) \right]  \\
 \log p(x) &\ge  \underbrace{ \int\limits_{z}  \log  \frac{p(x,z)}{q(z|x)} q(z|x)dz }_{ELBO} \\
 \end{align*}
-$$
+```
 
-The objective $\mathop{\argmax}\limits_{\theta} \log p(x)$ changes to $\mathop{\argmax}\limits_{\theta,\phi} \int\limits_{z}  \log  \frac{p(x,z)}{q(z|x)} q(z|x)dz$
+The objective 
+${\mathop{argmax}\limits_{\theta}}{\log p(x)}$ changes to $${\mathop{argmax}\limits_{\theta,\phi}} {\int\limits_{z}  \log  \frac{p(x,z)}{q(z|x)} q(z|x)dz}$$
 
 
 
-$$
+```math
 \begin{align*}
-
 \int\limits_{z}  \log  \frac{p(x,z)}{q(z|x)} q(z|x)dz &= \int\limits_{z}  \log  \frac{p(x|z)p(z)}{q(z|x)} q(z|x)dz \\
-
 &= \int\limits_{z} \left[   \log  \frac{p(z)}{q(z|x)} +   \log  p(x|z) \right] q(z|x)dz \\
-
 &= \int\limits_{z}  \log  \frac{p(z)}{q(z|x)} q(z|x)dz +  \int\limits_{z}  \log  p(x|z) q(z|x)dz \\
-
 &= \int\limits_{z}  q(z|x)  \log p(x|z)dz - \int\limits_{z}  \log  \frac{q(z|x)}{p(z)} q(z|x)dz  \\
-
 &= \underbrace{ \mathbb{E}_{z\sim q(z|x)} \left[\log p(x|z) \right] }_{\text{Reconstruction}} - \underbrace{D_{KL} \left[  \log  q(z|x) || p(z)  \right ]}_{\text{KL Divergence}} \\
 \end{align*}
-$$
+```
 
 
-The objective $\mathop{\argmax}\limits_{\theta,\phi} \int\limits_{z}  \log  \frac{p(x,z)}{q(z|x)} q(z|x)dz$ is divided into two sub-goals:
+The objective $\mathop{argmax}\limits_{\theta,\phi} \int\limits_{z}  \log  \frac{p(x,z)}{q(z|x)} q(z|x)dz$ is divided into two sub-goals:
 
-1. **Maximize the Expected Log-Likelihood:** $$\mathop{\argmax}\limits_{\theta,\phi} \mathbb{E}_{z\sim q(z|x)} \log p(x|z) $$
+1. **Maximize the Expected Log-Likelihood:** $$\mathop{argmax}\limits_{\theta,\phi} \mathbb{E}_{z\sim q(z|x)} \log p(x|z) $$
 
-2. **Minimize the Kullback-Leibler Divergence:** $$\mathop{\argmin}\limits_{\theta,\phi} D_{KL} \left[  \log  q(z|x) || p(z)  \right ]$$
+2. **Minimize the Kullback-Leibler Divergence:** $$\mathop{argmin}\limits_{\theta,\phi} D_{KL} \left[  \log  q(z|x) || p(z)  \right ]$$
 
 
 ### Maximize the Expected Log-Likelihood
 
-$$
+```math
 \begin{align*}
 
 \mathbb{E}_{z\sim q(z|x)} \log p(x|z) 
@@ -138,20 +134,20 @@ e^{ \left[
 
 
 \end{align*} 
-$$
+```
 
-Now the subjective $\mathop{\argmax}\limits_{\theta,\phi} \mathbb{E}_{z\sim q(z|x)} \log p(x|z) $  changes to 
+Now the subjective ${\mathop{argmax}\limits_{\theta,\phi}} \mathbb{E}_{z\sim q(z|x)} \log p(x|z) $  changes to 
 
-$$
-\mathop{\argmin}\limits_{\theta,\phi}
+```math
+\mathop{argmin}\limits_{\theta,\phi}
 \frac{1}{n} \sum_{i=1}^{n} \left[
  (x_i - f(z_i))^T  (x_i - f(z_i))
 \right]
-$$
+```
 
 We can deduct further
 
-$$
+```math
 \begin{align*}
 
 \frac{1}{n} \sum_{i=1}^{n} \left[
@@ -167,15 +163,15 @@ $$
 \\
 
 \end{align*}
-$$
+```
 
 Hence the final optimization goal is 
 
-$$
-\mathop{\argmin}\limits_{\theta,\phi}
+```math
+\mathop{argmin}\limits_{\theta,\phi}
 \frac{1}{n} \sum_{i=1}^{n} 
 [x_i - f(z_i)]^2 
-$$
+```
 
 
 ```python
@@ -188,7 +184,7 @@ def mse_loss(y_true, y_pred):
 ### Minimize the Kullback-Leibler Divergence
 
 
-$$
+```math
 \begin{align*}
 
  D_{KL} \left[  \log  q(z|x) || p(z)  \right ]
@@ -256,6 +252,20 @@ e^{ \left[ - \frac{ (z-\mu)^2 } { 2 \sigma^2} + \frac{ z^2 } { 2 }  \right] }
 - \int  q(z|x) \log \sigma ^ 2 dz
 - \int  q(z|x) \frac{ (z-\mu)^2 } { \sigma^2} dz  \right]   \\
 
+
+\end{align*}
+```
+
+It can be deducated further :
+
+```math
+\begin{align*}
+
+
+&= \frac{ 1 } { 2 }  \left[ 
+    \mathbb{E}_{z\sim q(z|x)} (z^2) 
+- \int  q(z|x) \log \sigma ^ 2 dz
+- \int  q(z|x) \frac{ (z-\mu)^2 } { \sigma^2} dz  \right]   \\
 
 &= \frac{ 1 } { 2 }  \left[ 
     \mathbb{D}_{z\sim q(z|x)} (z) + [\mathbb{E}_{z\sim q(z|x)} (z)]^2
@@ -329,9 +339,8 @@ e^{ \left[ - \frac{ (z-\mu)^2 } { 2 \sigma^2} + \frac{ z^2 } { 2 }  \right] }
 -  \log  \sigma ^ 2 
 - 1
 \right]   \\
-
 \end{align*}
-$$
+```
 
 
 ```python
