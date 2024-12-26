@@ -22,7 +22,7 @@ print("Device :", device)
 batch_size=32
 learning_rate = 1e-3
 weight_decay = 1e-2
-num_epochs = 1
+num_epochs = 50
 
 
 
@@ -67,7 +67,7 @@ class CartoonSetDataset(Dataset):
 
 # Create datasets
 train_datasets = []
-for i in range(1, 10):  # Directories 1 to 9 for training
+for i in range(1, 2):  # Directories 1 to 9 for training
     train_datasets.append(CartoonSetDataset(image_dir=f'/cartoonset100k/{i}/'))
 
 # Combine all training datasets into one
