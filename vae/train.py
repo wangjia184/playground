@@ -20,10 +20,21 @@ print("Device :", device)
 
 #######################################################################
 batch_size=32
-learning_rate = 1e-3
+learning_rate = 1e-4
 weight_decay = 1e-2
 num_epochs = 50
+width = 256
+height = 256
+latent_dims = 64*64
 
+def export_image(tensor, filename):
+    tensor = (tensor.squeeze(0) + 1) / 2 * 255  # Shape becomes [3, width, height]
+    tensor = tensor.byte()  
+
+    tensor = tensor.permute(1, 2, 0)  # Shape becomes [width, height, 3]
+
+    image = Image.fromarray(tensor.cpu().numpy())
+    image.save(filename, 'PNG')
 
 
 #######################################################################
@@ -31,22 +42,25 @@ num_epochs = 50
 def preprocess_image(image_path):
     image = Image.open(image_path).convert('RGB')
 
-    # Transform to tensor
-    transform = transforms.Compose([
-        transforms.ToTensor(), 
-    ])
-    image_tensor = transform(image)  # Shape: [3, H, W] (RGB)
+    # Clip the image to 350x350 from the center
+    originalWidth, originalHeight = image.size
+    new_size = 350
 
-    # Add padding
-    height, width = image_tensor.shape[1:3]
-    left = (512 - width) // 2
-    right = 512 - width - left
-    top = (512 - height) // 2
-    bottom = 512 - height - top
-    padding = (left, right, top, bottom)  # (left, right, top, bottom)
-    image_tensor = F.pad(image_tensor, padding, mode='constant', value=1)  # Change value as needed
-    
-    # Adjust pixel value range to [-1, 1]
+    # Calculate the cropping box
+    left = (originalWidth - new_size) // 2
+    upper = (originalHeight - new_size) // 2
+    right = left + new_size
+    lower = upper + new_size
+    image = image.crop((left, upper, right, lower))
+
+    image = image.resize((width, height))
+
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+    ])
+    image_tensor = transform(image)  # Shape: [3, width, height] (RGB)
+
+    # Step 4: Adjust pixel value range to [-1, 1]
     image_tensor = image_tensor * 2.0 - 1.0  # Scale to [-1, 1]
     
     return image_tensor
@@ -103,7 +117,7 @@ def train(model, dataloader, optimizer, prev_updates, writer=None):
         optimizer.zero_grad()  # Zero the gradients
         
         output = model.forward(data, compute_loss = True)  # Forward pass
-        loss = output.loss
+        loss = output.loss_recon * 1000 + output.loss_kl
         
         loss.backward()
         
@@ -116,7 +130,7 @@ def train(model, dataloader, optimizer, prev_updates, writer=None):
                     total_norm += param_norm.item() ** 2
             total_norm = total_norm ** (1. / 2)
         
-            print(f'Step {n_upd:,} (N samples: {n_upd*batch_size:,}), Loss: {loss.item():.4f} (Recon: {output.loss_recon.item():.4f}, KL: {output.loss_kl.item():.4f}) Grad: {total_norm:.4f}')
+            print(f'Step {n_upd:,} (N samples: {n_upd*batch_size:,}), Loss: {loss.item():.4f} (Recon: {output.loss_recon.item() * 1000:.4f}, KL: {output.loss_kl.item():.4f}) Grad: {total_norm:.4f}')
 
             if writer is not None:
                 global_step = n_upd
@@ -173,22 +187,24 @@ def test(model, dataloader, cur_step, writer=None):
         writer.add_scalar('Loss/Test/KLD', output.loss_kl.item(), global_step=cur_step)
         
         # Log reconstructions
-        writer.add_images('Test/Reconstructions', output.x_recon.view(-1, 1, 512, 512), global_step=cur_step)
-        writer.add_images('Test/Originals', data.view(-1, 1, 512, 512), global_step=cur_step)
+        writer.add_images('Test/Reconstructions', output.x_recon.view(-1, 1, width, height), global_step=cur_step)
+        writer.add_images('Test/Originals', data.view(-1, 1, width, height), global_step=cur_step)
         
         # Log random samples from the latent space
-        z = torch.randn(16, 4096).to(device)
+        z = torch.randn(16, latent_dims).to(device)
         samples = model.decode(z)
-        writer.add_images('Test/Samples', samples.view(-1, 1, 512, 512), global_step=cur_step)
+        writer.add_images('Test/Samples', samples.view(-1, 1, width, height), global_step=cur_step)
 
 #######################################################################
 
 def main():
+
+    # export_image( preprocess_image("cs11586503401773021.png"), "256x256.png")
     
     if not os.path.exists('/app/models/'):
         os.makedirs('/app/models/')
 
-    model = VAE(device)
+    model = VAE(device, width, height, latent_dims)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     writer = SummaryWriter(f'/app/runs/vae_{datetime.now().strftime("%Y%m%d-%H%M%S")}')
 

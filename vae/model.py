@@ -28,74 +28,95 @@ class VAEOutput:
 
 
 
-
 class Encoder(nn.Module):
-    def __init__(self):
+    def __init__(self, width, height, latent_dims):
         super(Encoder, self).__init__()
+        self.width = width
+        self.height = height
+        self.latent_dims = latent_dims
+        
+        # Calculate the final output size after several convolutions
         self.layers = nn.Sequential(
-            nn.Conv2d(3, 32, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(3, 32, kernel_size=3, stride=2, padding=1),  # Output: [32, height/2, width/2]
             nn.BatchNorm2d(32),
             nn.SiLU(),
 
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),  # Output: [64, height/4, width/4]
             nn.BatchNorm2d(64),
             nn.SiLU(),
 
-            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),  # Output: [64, height/8, width/8]
             nn.BatchNorm2d(64),
             nn.SiLU(),
 
-            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),  # Output: [64, height/16, width/16]
             nn.BatchNorm2d(64),
             nn.SiLU(),
 
-            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),  # Output: [64, height/32, width/32]
             nn.BatchNorm2d(64),
             nn.SiLU(),
 
-            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),  # Output: [64, height/64, width/64]
             nn.BatchNorm2d(64),
             nn.SiLU(),
         )
+        
+        # Calculate the flattened size for the fully connected layers
+        final_height = height // 64
+        final_width = width // 64
         self.flatten = nn.Flatten()
-        self.mean = nn.Linear(64 * 8 * 8, 4096)
-        self.log_var = nn.Linear(64 * 8 * 8, 4096)
+        self.mean = nn.Linear(64 * final_height * final_width, latent_dims)
+        self.log_var = nn.Linear(64 * final_height * final_width, latent_dims)
 
     def predict(self, x):
+
+        if x.shape[1:] != (3, self.height, self.width):
+            raise ValueError(f"Input shape must be (batch_size, 3, {self.height}, {self.width}),"
+                             f" but got {x.shape[1:]}.")
+        
         x = self.layers(x)
         x = self.flatten(x)
-        mean = self.mean(x)       # shape = [1, 4096]
-        log_var = self.log_var(x) # shape = [1, 4096]
+        mean = self.mean(x)       # shape = [batch_size, latent_dims]
+        log_var = self.log_var(x) # shape = [batch_size, latent_dims]
         return mean, log_var
 
 
 class Decoder(nn.Module):
-    def __init__(self):
+    def __init__(self, width, height, latent_dims):
         super(Decoder, self).__init__()
-        self.fc = nn.Linear(4096, 64 * 8 * 8)
-        self.reshape = lambda x: x.view(-1, 64, 8, 8)
+        self.latent_dims = latent_dims
+        self.width = width
+        self.height = height
+        
+        # Calculate the flattened size for reshaping
+        final_height = height // 64
+        final_width = width // 64
+        self.fc = nn.Linear(latent_dims, 64 * final_height * final_width)
+        self.reshape = lambda x: x.view(-1, 64, final_height, final_width)
+        
         self.layers = nn.Sequential(
-            nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [64, height/32, width/32]
             nn.BatchNorm2d(64),
             nn.SiLU(),
 
-            nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [64, height/16, width/16]
             nn.BatchNorm2d(64),
             nn.SiLU(),
 
-            nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [64, height/8, width/8]
             nn.BatchNorm2d(64),
             nn.SiLU(),
 
-            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [32, height/4, width/4]
             nn.BatchNorm2d(32),
             nn.SiLU(),
 
-            nn.ConvTranspose2d(32, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(32, 32, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [32, height/2, width/2]
             nn.BatchNorm2d(32),
             nn.SiLU(),
 
-            nn.ConvTranspose2d(32, 3, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(32, 3, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [3, height, width]
             nn.Tanh(),
         )
 
@@ -107,12 +128,12 @@ class Decoder(nn.Module):
 
 
 class VAE(nn.Module):
-    def __init__(self, device):
+    def __init__(self, device, width, height, latent_dims):
         super(VAE, self).__init__()
         self.device = device
-        self.encoder = Encoder().to(device)
+        self.encoder = Encoder(width, height, latent_dims).to(device)
         self.softplus = nn.Softplus()
-        self.decoder = Decoder().to(device)
+        self.decoder = Decoder(width, height, latent_dims).to(device)
 
     def encode(self, x, eps: float = 1e-8):
         """
