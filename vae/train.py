@@ -67,7 +67,7 @@ class CartoonSetDataset(Dataset):
 
 # Create datasets
 train_datasets = []
-for i in range(1, 2):  # Directories 1 to 9 for training
+for i in range(1, 10):  # Directories 1 to 9 for training
     train_datasets.append(CartoonSetDataset(image_dir=f'/cartoonset100k/{i}/'))
 
 # Combine all training datasets into one
@@ -155,7 +155,6 @@ def test(model, dataloader, cur_step, writer=None):
     with torch.no_grad():
         for data in tqdm(dataloader, desc='Testing'):
             data = data.to(device)
-            data = data.view(data.size(0), -1)  # Flatten the data
             
             output = model.forward(data, compute_loss=True)  # Forward pass
             
@@ -186,6 +185,9 @@ def test(model, dataloader, cur_step, writer=None):
 
 def main():
     
+    if not os.path.exists('/app/models/'):
+        os.makedirs('/app/models/')
+
     model = VAE(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     writer = SummaryWriter(f'/app/runs/vae_{datetime.now().strftime("%Y%m%d-%H%M%S")}')
