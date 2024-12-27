@@ -1,0 +1,6 @@
+[submodule "dcae/dc-ae-f32c32-in-1.0"]
+	path = dcae/dc-ae-f32c32-in-1.0
+	url = https://huggingface.co/mit-han-lab/dc-ae-f32c32-in-1.0
+[submodule "dcae/efficientvit"]
+	path = dcae/efficientvit
+	url = https://github.com/mit-han-lab/efficientvit.git

@@ -10,7 +10,7 @@ from PIL import Image
 from datetime import datetime
 from model import VAE
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
 
 print("Python :", sys.version)
 print("Pytorch :", torch.__version__)
@@ -21,8 +21,8 @@ print("Device :", device)
 #######################################################################
 batch_size=32
 learning_rate = 1e-4
-weight_decay = 1e-2
-num_epochs = 50
+weight_decay = 1e-3
+num_epochs = 2
 width = 256
 height = 256
 latent_dims = 64*64
@@ -81,7 +81,7 @@ class CartoonSetDataset(Dataset):
 
 # Create datasets
 train_datasets = []
-for i in range(1, 2):  # Directories 1 to 9 for training
+for i in range(1, 10):  # Directories 1 to 9 for training
     train_datasets.append(CartoonSetDataset(image_dir=f'/cartoonset100k/{i}/'))
 
 # Combine all training datasets into one

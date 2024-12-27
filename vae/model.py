@@ -27,7 +27,6 @@ class VAEOutput:
     loss_kl: torch.Tensor
 
 
-
 class Encoder(nn.Module):
     def __init__(self, width, height, latent_dims):
         super(Encoder, self).__init__()
@@ -35,50 +34,47 @@ class Encoder(nn.Module):
         self.height = height
         self.latent_dims = latent_dims
         
-        # Calculate the final output size after several convolutions
         self.layers = nn.Sequential(
-            nn.Conv2d(3, 32, kernel_size=3, stride=2, padding=1),  # Output: [32, height/2, width/2]
-            nn.BatchNorm2d(32),
-            nn.SiLU(),
-
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),  # Output: [64, height/4, width/4]
+            nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=1),  # Output: [64, height/2, width/2]
             nn.BatchNorm2d(64),
             nn.SiLU(),
 
-            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),  # Output: [64, height/8, width/8]
-            nn.BatchNorm2d(64),
+            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),  # Output: [128, height/4, width/4]
+            nn.BatchNorm2d(128),
             nn.SiLU(),
 
-            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),  # Output: [64, height/16, width/16]
-            nn.BatchNorm2d(64),
+            nn.Conv2d(128, 128, kernel_size=3, stride=2, padding=1),  # Output: [128, height/8, width/8]
+            nn.BatchNorm2d(128),
             nn.SiLU(),
 
-            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),  # Output: [64, height/32, width/32]
-            nn.BatchNorm2d(64),
+            nn.Conv2d(128, 128, kernel_size=3, stride=2, padding=1),  # Output: [128, height/16, width/16]
+            nn.BatchNorm2d(128),
             nn.SiLU(),
 
-            nn.Conv2d(64, 64, kernel_size=3, stride=2, padding=1),  # Output: [64, height/64, width/64]
-            nn.BatchNorm2d(64),
+            nn.Conv2d(128, 128, kernel_size=3, stride=2, padding=1),  # Output: [128, height/32, width/32]
+            nn.BatchNorm2d(128),
+            nn.SiLU(),
+
+            nn.Conv2d(128, 128, kernel_size=3, stride=2, padding=1),  # Output: [128, height/64, width/64]
+            nn.BatchNorm2d(128),
             nn.SiLU(),
         )
         
-        # Calculate the flattened size for the fully connected layers
         final_height = height // 64
         final_width = width // 64
         self.flatten = nn.Flatten()
-        self.mean = nn.Linear(64 * final_height * final_width, latent_dims)
-        self.log_var = nn.Linear(64 * final_height * final_width, latent_dims)
+        self.mean = nn.Linear(128 * final_height * final_width, latent_dims)
+        self.log_var = nn.Linear(128 * final_height * final_width, latent_dims)
 
     def predict(self, x):
-
         if x.shape[1:] != (3, self.height, self.width):
             raise ValueError(f"Input shape must be (batch_size, 3, {self.height}, {self.width}),"
                              f" but got {x.shape[1:]}.")
         
         x = self.layers(x)
         x = self.flatten(x)
-        mean = self.mean(x)       # shape = [batch_size, latent_dims]
-        log_var = self.log_var(x) # shape = [batch_size, latent_dims]
+        mean = self.mean(x)
+        log_var = self.log_var(x)
         return mean, log_var
 
 
@@ -89,34 +85,33 @@ class Decoder(nn.Module):
         self.width = width
         self.height = height
         
-        # Calculate the flattened size for reshaping
         final_height = height // 64
         final_width = width // 64
-        self.fc = nn.Linear(latent_dims, 64 * final_height * final_width)
-        self.reshape = lambda x: x.view(-1, 64, final_height, final_width)
+        self.fc = nn.Linear(latent_dims, 128 * final_height * final_width)
+        self.reshape = lambda x: x.view(-1, 128, final_height, final_width)
         
         self.layers = nn.Sequential(
-            nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [64, height/32, width/32]
+            nn.ConvTranspose2d(128, 128, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [128, height/32, width/32]
+            nn.BatchNorm2d(128),
+            nn.SiLU(),
+
+            nn.ConvTranspose2d(128, 128, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [128, height/16, width/16]
+            nn.BatchNorm2d(128),
+            nn.SiLU(),
+
+            nn.ConvTranspose2d(128, 128, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [128, height/8, width/8]
+            nn.BatchNorm2d(128),
+            nn.SiLU(),
+
+            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [64, height/4, width/4]
             nn.BatchNorm2d(64),
             nn.SiLU(),
 
-            nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [64, height/16, width/16]
+            nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [64, height/2, width/2]
             nn.BatchNorm2d(64),
             nn.SiLU(),
 
-            nn.ConvTranspose2d(64, 64, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [64, height/8, width/8]
-            nn.BatchNorm2d(64),
-            nn.SiLU(),
-
-            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [32, height/4, width/4]
-            nn.BatchNorm2d(32),
-            nn.SiLU(),
-
-            nn.ConvTranspose2d(32, 32, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [32, height/2, width/2]
-            nn.BatchNorm2d(32),
-            nn.SiLU(),
-
-            nn.ConvTranspose2d(32, 3, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [3, height, width]
+            nn.ConvTranspose2d(64, 3, kernel_size=3, stride=2, padding=1, output_padding=1),  # Output: [3, height, width]
             nn.Tanh(),
         )
 
