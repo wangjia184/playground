@@ -3,3 +3,4 @@ __pycache__
 runs
 models
 /vae/animation.gif
+/sde_diffusion/cifar10-64.tar.gz
