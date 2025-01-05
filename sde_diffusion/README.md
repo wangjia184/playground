@@ -31,7 +31,7 @@ x_i &= \sqrt{1-\frac{1}{N} \bar{\beta_i}} x_{i-1} + \sqrt{\frac{1}{N} \bar{\beta
 \end{align*}
 ```
 
-As \( N \to \infty \), the discrete process transitions into a continuous process for \( x(t) \), where \( t \in [0.0, 1.0] \). To formalize this, we introduce the following definitions, with \( \beta \) now treated as a continuous function:
+As $N \to \infty$, the discrete process transitions into a continuous process for $x(t)$, where $t \in [0.0, 1.0]$. To formalize this, we introduce the following definitions, with $\beta$ now treated as a continuous function:
 
 ```math
 \begin{align*}
@@ -81,7 +81,7 @@ q(x_t|x_0) &\sim \mathcal{N}\left( x(0) \exp\left( -\frac{1}{2} \int_0^t \beta(s
 \end{align*}
 ```
 
-In Denoising Diffusion Probabilistic Models (DDPM), the noise schedule \(\beta(t)\) is defined as follows:
+In Denoising Diffusion Probabilistic Models (DDPM), the noise schedule $\beta(t)$ is defined as follows:
 
 ```math
 \begin{align*}
@@ -89,7 +89,7 @@ In Denoising Diffusion Probabilistic Models (DDPM), the noise schedule \(\beta(t
 \end{align*}
 ```
 
-Here, \(\bar{\beta}_{min}\) and \(\bar{\beta}_{max}\) represent the minimum and maximum values of the noise schedule, respectively. The integral of \(\beta(t)\) is used to compute the cumulative noise up to time \(t\).
+Here, $\bar{\beta}\_{min}$ and $\bar{\beta}\_{max}$ represent the minimum and maximum values of the noise schedule, respectively. The integral of $\beta(t)$ is used to compute the cumulative noise up to time $t$.
 
 ```math
 \begin{align*}
@@ -97,7 +97,7 @@ Here, \(\bar{\beta}_{min}\) and \(\bar{\beta}_{max}\) represent the minimum and 
 \end{align*}
 ```
 
-The forward process \(q(x_t|x_0)\) in DDPM is defined as a Gaussian distribution:
+The forward process $q(x_t|x_0)$ in DDPM is defined as a Gaussian distribution:
 
 ```math
 q(x_t|x_0) \sim \mathcal{N}\left( x(0) 
@@ -121,7 +121,7 @@ def marginal_prob(self, x, t):
 
 ## Loss Function
 
-Given that \(q(x_t | x_0)\) is a Gaussian distribution, \(\nabla \log q(x_t | x_0)\) can be derived as follows:
+Given that $q(x_t | x_0)$ is a Gaussian distribution, $\nabla \log q(x_t | x_0)$ can be derived as follows:
 
 ```math
 \begin{align*}
