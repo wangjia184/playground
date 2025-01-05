@@ -59,7 +59,27 @@ dx &= \underbrace{- \frac{1}{2} \beta(t)  x(t) }_{f(x,t)} dt  + \underbrace{\sqr
 \end{align*}
 ```
 
-## From SDE to $q(x_t|x_0)$
+## Reverse Process
+
+The reverse time SDE is :
+
+```math
+dx = [f(x,t)-g(t)^2 \nabla \log p_t(x)]dt + g(t)d \bar{\omega}
+```
+
+And reverse time ODE is :
+
+```math
+dx = [f(x,t)- \frac{1}{2} g(t)^2 \nabla \log p_t(x)]dt
+```
+
+For DDPM, its discrete is
+
+```math
+x_{i-1} = (2-\sqrt{1-\beta_{i}})x_i + \frac{1}{2} \beta_i s_\theta(x_i, i)
+```
+
+## From Forward SDE to $q(x_t|x_0)$
 
 ```math
 \begin{align*}

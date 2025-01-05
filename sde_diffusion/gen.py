@@ -9,6 +9,7 @@ from torchvision import transforms
 from PIL import Image
 from datetime import datetime
 from network import UNet
+from sde import VariancePreservingSDE
 
 device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
 
@@ -31,12 +32,13 @@ def export_image(tensor, filename):
     image = Image.fromarray(tensor.cpu().numpy())
     image.save(filename, 'PNG')
 
-def euler_sampling(model, num_samples=1, num_steps=1000):
+def euler_sampling(model, sde, num_samples=1, num_steps=1000):
     """
-    Generate samples using Euler method for ODE.
+    Generate samples using Euler method for the reverse ODE.
     
     Args:
         model (nn.Module): The trained UNet model.
+        sde (VariancePreservingSDE): The SDE object.
         num_samples (int): Number of samples to generate.
         num_steps (int): Number of Euler steps.
     
@@ -44,22 +46,26 @@ def euler_sampling(model, num_samples=1, num_steps=1000):
         torch.Tensor: Generated samples.
     """
     # Initial noise (Gaussian prior)
-    x = torch.randn((num_samples, 3, width, height)).to(device)  # Shape: [N, C, H, W]
+    x = torch.randn((num_samples, 3, 32, 32)).to(device)  # Shape: [N, C, H, W]
     
-    # Time steps (from 1 to 0)
-    timesteps = torch.linspace(1.0, 0.0, num_steps + 1).to(device)  # Shape: [T+1]
+    # Time steps (from T to 0)
+    timesteps = torch.linspace(sde.T, sde.t_epsilon, num_steps + 1).to(device)  # Shape: [T+1]
+    h = (sde.T - sde.t_epsilon) / num_steps  # Step size
     
     # Euler method
     for i in tqdm(range(num_steps), desc="Sampling"):
         t = timesteps[i]
-        dt = timesteps[i] - timesteps[i + 1]  # Time step size
         
-        # Predict the score (drift term)
+        # Predict the score (score function)
         with torch.no_grad():
             score = model(x, t.expand(num_samples))  # Shape: [N, C, H, W]
         
+        # Compute drift and diffusion terms
+        drift = sde.f(t, x)  # Drift term
+        diffusion = sde.g(t, x)  # Diffusion term
+        
         # Update x using Euler step
-        x = x + score * dt
+        x = x + h * (drift - 0.5 * diffusion**2 * score)
     
     return x
 
@@ -69,6 +75,7 @@ def main():
         print("`/app/models/sde_final.pth` does not exist")
         return
     
+    sde = VariancePreservingSDE()
     model = UNet(
             input_channels=3,
             input_height=32,
@@ -84,9 +91,9 @@ def main():
     model.eval()
     
     # Generate samples
-    num_samples = 2  # Number of images to generate
+    num_samples = 1  # Number of images to generate
     num_steps = 1000  # Number of Euler steps
-    generated_images = euler_sampling(model, num_samples, num_steps)
+    generated_images = euler_sampling(model, sde, num_samples, num_steps)
     
     # Save the generated images
     if not os.path.exists('/app/generated/'):
@@ -95,8 +102,7 @@ def main():
     for i in range(num_samples):
         export_image(generated_images[i], f'/app/generated/sample_{i}.png')
         print(f"Saved generated image to /app/generated/sample_{i}.png")
- 
-    
+
     
 
 if __name__ == "__main__":
