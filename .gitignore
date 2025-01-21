@@ -4,3 +4,6 @@ runs
 models
 /vae/animation.gif
 /sde_diffusion/cifar10-64.tar.gz
+/sde_diffusion/ckpts
+/sde_diffusion/data
+/sde_diffusion/generated

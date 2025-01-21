@@ -8,8 +8,17 @@ from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 from PIL import Image
 from datetime import datetime
-from network import UNet
-from sde import VariancePreservingSDE
+
+from torchvision.datasets import FashionMNIST
+from torchvision import transforms
+from torch.utils.data import DataLoader
+from torch_ema import ExponentialMovingAverage
+from sde import VE_SDE, VP_SDE, SubVP_SDE
+from network import create_improved_unet
+import xformers
+
+# Print the version of xformers
+
 
 device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
 
@@ -17,13 +26,14 @@ print("Python :", sys.version)
 print("Pytorch :", torch.__version__)
 print("CUDA :", torch.version.cuda)
 print("Device :", device)
-
+print("xformers version :", xformers.__version__)
 
 #######################################################################
 batch_size=32
 learning_rate = 2e-4
-weight_decay = 1e-3
-num_epochs = 50
+weight_decay = 1e-12
+ema_decay=0.999
+num_epochs = 10
 width = 32
 height = 32
 
@@ -54,6 +64,7 @@ def preprocess_image(image_path):
     
     return image_tensor
 
+"""
 # Custom dataset class
 class Cifar10Dataset(Dataset):
     def __init__(self, image_dir):
@@ -88,49 +99,12 @@ test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num
 
 #######################################################################
 eps=1e-5
+"""
 
-
-# Define EMA class
-class EMA:
-    def __init__(self, model, decay=0.9999):
-        self.model = model
-        self.decay = decay
-        self.shadow = {}
-        self.backup = {}
-
-    def register(self):
-        """Register model parameters for EMA."""
-        for name, param in self.model.named_parameters():
-            if param.requires_grad:
-                self.shadow[name] = param.data.clone()
-
-    def update(self):
-        """Update EMA parameters."""
-        for name, param in self.model.named_parameters():
-            if param.requires_grad:
-                assert name in self.shadow
-                new_average = (1.0 - self.decay) * param.data + self.decay * self.shadow[name]
-                self.shadow[name] = new_average.clone()
-
-    def apply_shadow(self):
-        """Apply EMA parameters to the model."""
-        for name, param in self.model.named_parameters():
-            if param.requires_grad:
-                assert name in self.shadow
-                self.backup[name] = param.data
-                param.data = self.shadow[name]
-
-    def restore(self):
-        """Restore original model parameters."""
-        for name, param in self.model.named_parameters():
-            if param.requires_grad:
-                assert name in self.backup
-                param.data = self.backup[name]
-        self.backup = {}
 
 
 # Modified training function
-def train(model, sde, dataloader, optimizer, prev_updates, ema=None, writer=None):
+def train(model, sde, dataloader, optimizer, ema, writer=None):
     """
     Trains the model on the given data.
     
@@ -144,49 +118,45 @@ def train(model, sde, dataloader, optimizer, prev_updates, ema=None, writer=None
         writer: The TensorBoard writer.
     """
     model.train()  # Set the model to training mode
-    
-    for batch_idx, data in enumerate(tqdm(dataloader)):
-        n_upd = prev_updates + batch_idx
-        
-        x0 = data.to(device)  # Shape = [N, C, W, H]
-        optimizer.zero_grad()  # Zero the gradients
 
-        t = sde.sample_time(x0)  # [N, 1, 1, 1]
-        xt, epsilon, std, g = sde.sample(t, x0, return_noise=True)  # [N,C,W,H] [N,C,W,H] [N,1,1,1] [N,C,W,H]
-        t = t.squeeze()  # [N,1,1,1] -> [N]
+    n_upd = 0
+    for epoch in range(num_epochs):
+        print(f'Epoch {epoch+1}/{num_epochs}')
 
-        score = model(xt, t)  # [N,C,W,H]
-        loss = ((score * std / g + epsilon) ** 2).view(xt.size(0), -1).sum(1, keepdim=False) / 2  # [N]
-        loss = loss.mean()
+        epoch_loss = 0.
+        for data, _ in tqdm(dataloader):
+            n_upd += 1
 
-        loss.backward()
+            optimizer.zero_grad() # Zero the gradients
+            x0 = data.to(device) # Shape = [N, C, W, H]
 
-        if n_upd % 100 == 0:
-            # Calculate and log gradient norms
-            total_norm = 0.0
-            for p in model.parameters():
-                if p.grad is not None:
-                    param_norm = p.grad.data.norm(2)
-                    total_norm += param_norm.item() ** 2
-            total_norm = total_norm ** (1. / 2)
-        
-            print(f'Step {n_upd:,} (N samples: {n_upd*batch_size:,}), Loss: {loss.item():.4f} Grad: {total_norm:.4f}')
+            loss = sde.loss(model, x0)
+            loss.backward()
 
-            if writer is not None:
-                global_step = n_upd
-                writer.add_scalar('Loss/Train', loss.item(), global_step)
-                writer.add_scalar('GradNorm/Train', total_norm, global_step)
+            if n_upd % 100 == 0:
+                # Calculate and log gradient norms
+                total_norm = 0.0
+                for p in model.parameters():
+                    if p.grad is not None:
+                        param_norm = p.grad.data.norm(2)
+                        total_norm += param_norm.item() ** 2
+                total_norm = total_norm ** (1. / 2)
+            
+                print(f'Step {n_upd:,} (N samples: {n_upd*batch_size:,}), Loss: {loss.item():.4f} Grad: {total_norm:.4f}')
 
-        # Gradient clipping
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-
-        optimizer.step()  # Update the model parameters
-
-        # Update EMA parameters
-        if ema is not None:
+                if writer is not None:
+                    global_step = n_upd
+                    writer.add_scalar('Loss/Train', loss.item(), global_step)
+                    writer.add_scalar('GradNorm/Train', total_norm, global_step)
+                    
+            optimizer.step()
             ema.update()
+            epoch_loss += loss.item()
         
-    return prev_updates + len(dataloader)
+        with ema.average_parameters():
+            torch.save(model.state_dict(), f'/app/ckpts/{epoch}.ckpt')
+        
+
 
 
 
@@ -242,51 +212,23 @@ def test(model, dataloader, cur_step, writer=None):
 
 # Modified main function
 def main():
-    if not os.path.exists('/app/models/'):
-        os.makedirs('/app/models/')
+    if not os.path.exists('/app/ckpts/'):
+        os.makedirs('/app/ckpts/')
 
-    sde = VariancePreservingSDE()
+    train_data = FashionMNIST(root='data', train=True, download=True, transform=transforms.ToTensor())
+    train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True, drop_last=True)
 
-    model = UNet(
-        input_channels=3,
-        input_height=32,
-        ch=256,
-        ch_mult=(1, 2, 4, 8),
-        num_res_blocks=3,
-        attn_resolutions=(16, 8),
-        resamp_with_conv=True,
-        dropout=0.1,
-    )
-    model = model.to(device)
+    # Define the UNet2DModel with parameters matching your custom U-Net
+    model = create_improved_unet().to(device)
 
-    # Define optimizer
+    sde = VP_SDE(rescale=True).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
-
-    # Define EMA
-    ema = EMA(model, decay=0.9999)
-    ema.register()
+    ema = ExponentialMovingAverage(model.parameters(), decay=ema_decay)
 
     # Define TensorBoard writer
     writer = SummaryWriter(f'/app/runs/sde_{datetime.now().strftime("%Y%m%d-%H%M%S")}')
 
-    prev_updates = 0
-    for epoch in range(num_epochs):
-        print(f'Epoch {epoch+1}/{num_epochs}')
-        prev_updates = train(model, sde, train_loader, optimizer, prev_updates, ema=ema, writer=writer)
-
-        # Save EMA model parameters
-        ema.apply_shadow()
-        torch.save(model.state_dict(), f'/app/models/sde_epoch_{epoch}_ema.pth')
-        ema.restore()
-
-        # Save original model parameters
-        torch.save(model.state_dict(), f'/app/models/sde_epoch_{epoch}.pth')
-
-    # Save final model
-    ema.apply_shadow()
-    torch.save(model.state_dict(), '/app/models/sde_final_ema.pth')
-    ema.restore()
-    torch.save(model.state_dict(), '/app/models/sde_final.pth')
+    train( model, sde, train_dataloader, optimizer, ema, writer)
 
 if __name__ == "__main__":
     main()

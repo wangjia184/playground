@@ -141,7 +141,15 @@ def marginal_prob(self, x, t):
 
 ## Loss Function
 
-Given that $q(x_t | x_0)$ is a Gaussian distribution, $\nabla \log q(x_t | x_0)$ can be derived as follows:
+Given that $q(x_t | x_0)$ is a Gaussian distribution
+
+```math
+q(x_t|x_0) \sim \mathcal{N}\left( x(0)
+\underbrace{ \exp\left( -\frac{1}{2} \int_0^t \beta(s) ds \right) }_{\mu_t}, \, \underbrace{ 1 - \exp\left( -\int_0^t \beta(s) ds \right) }_{\sigma_t^2} \right) 
+```
+
+
+$\nabla \log q(x_t | x_0)$ can be derived as follows:
 
 ```math
 \begin{align*}
@@ -161,7 +169,5 @@ Now, we can derive the loss function step by step:
 \mathcal{L}_{\text{DSM}} &= \left\| s_{\theta}(x_t, t) - \nabla \log q(x_t | x_0) \right\|_2^2 & \text{Original DSM loss} \\
 \mathcal{L}_{\text{DSM}} &= \left\| s_{\theta}(x_t, t) + \frac{\epsilon}{\sigma_t} \right\|_2^2 & \because\nabla \log q(x_t | x_0) = -\frac{\epsilon}{\sigma_t}   \\
 \mathcal{L}_{\text{DSM}} &= \left\| \sigma_t \cdot s_{\theta}(x_t, t) + \epsilon \right\|_2^2  \\
-\mathcal{L}_{\text{DSM}} &= \left\| s_{\theta}(x_t, t) \cdot \frac{\sigma_t}{g_t} + \epsilon \right\|_2^2 & g_t = \sqrt{\beta(t)} \\
-\mathcal{L}_{\text{DSM}} &= \frac{1}{2} \mathbb{E}_{t, x_0, \epsilon} \left[ \left\| s_{\theta}(x_t, t) \cdot \frac{\sigma_t}{g_t} + \epsilon \right\|_2^2 \right] & \text{Final DSM loss with expectation}
 \end{align*}
 ```
