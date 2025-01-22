@@ -197,17 +197,6 @@ q(x_t|x_0) \sim \mathcal{N}\left( x(0)
 
 This equation describes the distribution of the noisy image \(x_t\) at time \(t\), given the original image \(x_0\). The mean of the distribution is scaled by an exponential decay factor, while the variance is derived from the cumulative noise.
 
-To compute this distribution in practice, the following Python function can be used. Given an input image `x` and a timestamp `t`, it calculates the mean and standard deviation of the distribution:
-
-```python
-def marginal_prob(self, x, t):
-    # Compute the log of the mean coefficient
-    log_mean_coeff = -0.5 * t * self.beta_0 - 0.25 * t**2 * (self.beta_1 - self.beta_0)
-
-    mean = torch.exp(log_mean_coeff[:, None, None, None]) * x
-    std = torch.sqrt(1.0 - torch.exp(2.0 * log_mean_coeff))
-    return mean, std
-```
 
 ### Loss Function
 
