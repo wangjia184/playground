@@ -48,7 +48,10 @@ def main():
     model.eval()
     
     # Generate samples
-    samples = sde.predictor_corrector_sample(model, (32, 1, 28, 28), device, n_lang_steps=2)
+    # samples = sde.predictor_corrector_sample(model, (32, 1, 28, 28), device, n_lang_steps=2)
+    # samples = sde.euler_ode_sample(model, (32, 1, 28, 28), device, n_steps=500)
+    samples = sde.euler_sde_sample(model, (32, 1, 28, 28), device, n_steps=500)
+    
     samples = torch.clamp(samples, 0, 1)
 
 

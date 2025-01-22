@@ -73,12 +73,6 @@ And reverse time ODE is :
 dx = [f(x,t)- \frac{1}{2} g(t)^2 \nabla \log p_t(x)]dt
 ```
 
-For DDPM, its discrete is
-
-```math
-x_{i-1} = (2-\sqrt{1-\beta_{i}})x_i + \frac{1}{2} \beta_i s_\theta(x_i, i)
-```
-
 ## From Forward SDE to $q(x_t|x_0)$
 
 ```math

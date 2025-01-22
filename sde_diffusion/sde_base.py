@@ -143,46 +143,67 @@ class SDEBase(nn.Module):
     
 
     @torch.no_grad()
-    def euler_step(self, model, x, t, delta_t):
-        """
-        Single-step update using the Euler method.
-
-        Args:
-            model: The model used to compute the score (s_theta(x_t, t)).
-            x: The current sample (x_t).
-            t: The current timestep (t).
-            delta_t: The timestep size.
-
-        Returns:
-            x_new: The updated sample (x_{t+delta_t}).
-        """
+    def euler_sde_step(self, model, x, t, delta_t):
+        # Compute the score function (∇ log p_t(x))
         score = self.forward(model, x, t)
+
+        # Compute the drift term (f(x, t)) and diffusion coefficient (g(t))
+        drift = self.drift_coef(x, t)
         g = self.diffusion_coef(t)
         g = self.match_dim(g, x)
-        drift = self.drift_coef(x, t)
-        x_new = x + (drift - (g**2) * score) * delta_t
+        
+        # Noise term for stochasticity
+        if t[0] <= self.eps:
+            z = 0 
+        else:
+            z = torch.randn_like(x) 
+        
+        # SDE update : dx = [f(x,t)-g(t)^2 ∇ log p_t(x)]dt + g(t) dw
+        x_mean = x - (drift - (g**2) * score) * delta_t  # Deterministic update
+        x_new = x_mean + g * np.sqrt(delta_t) * z  # dw = (dt)^0.5 * N(I, 0)
+
         return x_new
 
     @torch.no_grad()
-    def euler_sample(self, model, shape, device, n_steps=500):
-        """
-        Full sampling process using the Euler method.
-
-        Args:
-            model: The model used to compute the score.
-            shape: The shape of the generated samples (batch_size, channels, height, width).
-            device: The device (CPU or GPU).
-            n_steps: The number of timesteps.
-
-        Returns:
-            x_t: The generated sample.
-        """
+    def euler_sde_sample(self, model, shape, device, n_steps=500):
         x_t = torch.randn(shape).to(device)
+
+        # Define time steps (from t=1 to t=eps)
         time_steps = np.linspace(1, self.eps, n_steps)
-        delta_t = time_steps[0] - time_steps[1]
+        delta_t = time_steps[0] - time_steps[1] # Time step size
 
         for t in tqdm(time_steps):
             time_batch = torch.ones(shape[0], device=device) * t
-            x_t = self.euler_step(model, x_t, time_batch, delta_t)
+            x_t = self.euler_sde_step(model, x_t, time_batch, delta_t)
+        
+        return x_t
+    
+    @torch.no_grad()
+    def euler_ode_step(self, model, x, t, delta_t):
+        # Compute the score function (∇ log p_t(x))
+        score = self.forward(model, x, t)
+        
+        # Compute the drift term (f(x, t)) and diffusion coefficient (g(t))
+        drift = self.drift_coef(x, t)
+        g = self.diffusion_coef(t)
+        g = self.match_dim(g, x)
+        
+        # ODE update: dx = [f(x, t) - 0.5 * g(t)^2 * ∇ log p_t(x)] dt
+        dx = (drift - 0.5 * (g**2) * score) * delta_t
+        x_new = x - dx  # Note the negative sign for reverse-time ODE
+        
+        return x_new
 
+    @torch.no_grad()
+    def euler_ode_sample(self, model, shape, device, n_steps=500):
+        x_t = torch.randn(shape).to(device)
+        
+        # Define time steps (from t=1 to t=eps)
+        time_steps = np.linspace(1, self.eps, n_steps)
+        delta_t = time_steps[0] - time_steps[1]  # Time step size
+        
+        for t in tqdm(time_steps):
+            time_batch = torch.ones(shape[0], device=device) * t
+            x_t = self.euler_ode_step(model, x_t, time_batch, delta_t)
+        
         return x_t
