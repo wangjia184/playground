@@ -59,21 +59,97 @@ dx &= \underbrace{- \frac{1}{2} \beta(t)  x(t) }_{f(x,t)} dt  + \underbrace{\sqr
 \end{align*}
 ```
 
-## Reverse Process
+## Reverse Process Sampling
 
-The reverse time SDE is :
+### Reverse time SDE 
 
 ```math
 dx = [f(x,t)-g(t)^2 \nabla \log p_t(x)]dt + g(t)d \bar{\omega}
 ```
 
-And reverse time ODE is :
+Here is the simplest euler method 
+
+```python
+    @torch.no_grad()
+    def euler_sde_step(self, model, x, t, delta_t):
+        # Compute the score function (∇ log p_t(x))
+        score = self.forward(model, x, t)
+
+        # Compute the drift term (f(x, t)) and diffusion coefficient (g(t))
+        drift = self.drift_coef(x, t)
+        g = self.diffusion_coef(t)
+        g = self.match_dim(g, x)
+        
+        # Noise term for stochasticity
+        if t[0] <= self.eps:
+            z = 0 
+        else:
+            z = torch.randn_like(x) 
+        
+        # SDE update : dx = [f(x,t)-g(t)^2 ∇ log p_t(x)]dt + g(t) dw
+        x_mean = x - (drift - (g**2) * score) * delta_t  # Deterministic update
+        x_new = x_mean + g * np.sqrt(delta_t) * z  # dw = (dt)^0.5 * N(I, 0)
+
+        return x_new
+
+    @torch.no_grad()
+    def euler_sde_sample(self, model, shape, device, n_steps=500):
+        x_t = torch.randn(shape).to(device)
+
+        # Define time steps (from t=1 to t=eps)
+        time_steps = np.linspace(1, self.eps, n_steps)
+        delta_t = time_steps[0] - time_steps[1] # Time step size
+
+        for t in tqdm(time_steps):
+            time_batch = torch.ones(shape[0], device=device) * t
+            x_t = self.euler_sde_step(model, x_t, time_batch, delta_t)
+        
+        return x_t
+```
+
+### Reverse time ODE
 
 ```math
 dx = [f(x,t)- \frac{1}{2} g(t)^2 \nabla \log p_t(x)]dt
 ```
 
-## From Forward SDE to $q(x_t|x_0)$
+Here is the simplest euler method 
+
+```python
+    @torch.no_grad()
+    def euler_ode_step(self, model, x, t, delta_t):
+        # Compute the score function (∇ log p_t(x))
+        score = self.forward(model, x, t)
+        
+        # Compute the drift term (f(x, t)) and diffusion coefficient (g(t))
+        drift = self.drift_coef(x, t)
+        g = self.diffusion_coef(t)
+        g = self.match_dim(g, x)
+        
+        # ODE update: dx = [f(x, t) - 0.5 * g(t)^2 * ∇ log p_t(x)] dt
+        dx = (drift - 0.5 * (g**2) * score) * delta_t
+        x_new = x - dx  # Note the negative sign for reverse-time ODE
+        
+        return x_new
+
+    @torch.no_grad()
+    def euler_ode_sample(self, model, shape, device, n_steps=500):
+        x_t = torch.randn(shape).to(device)
+        
+        # Define time steps (from t=1 to t=eps)
+        time_steps = np.linspace(1, self.eps, n_steps)
+        delta_t = time_steps[0] - time_steps[1]  # Time step size
+        
+        for t in tqdm(time_steps):
+            time_batch = torch.ones(shape[0], device=device) * t
+            x_t = self.euler_ode_step(model, x_t, time_batch, delta_t)
+        
+        return x_t
+```
+
+## Training
+
+### From Forward SDE to $q(x_t|x_0)$
 
 ```math
 \begin{align*}
@@ -133,7 +209,7 @@ def marginal_prob(self, x, t):
     return mean, std
 ```
 
-## Loss Function
+### Loss Function
 
 Given that $q(x_t | x_0)$ is a Gaussian distribution
 
