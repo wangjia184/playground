@@ -7,3 +7,7 @@ models
 /sde_diffusion/ckpts
 /sde_diffusion/data
 /sde_diffusion/generated
+.results
+checkpoints
+/rectified_flow/data
+/rectified_flow/102flowers
