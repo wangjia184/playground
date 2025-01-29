@@ -1,25 +1,21 @@
 from copy import deepcopy
 from pathlib import Path
-
+from typing import Tuple
 import math
 import torch
-from torch.optim import Adam
+from torch.optim import AdamW
 from torch.nn import Module, ModuleList
 from torchvision.utils import save_image
-from flow import RectifiedFlow
+
 from einops import rearrange
 from ema_pytorch import EMA
 from accelerate import Accelerator
 
-from utils import divisible_by
+from flow import RectifiedFlow
+from network import create_unet
+from utils import divisible_by, exists, default
 
-# helpers
 
-def exists(v):
-    return v is not None
-
-def default(v, d):
-    return v if exists(v) else d
 
 # reflow wrapper
 
@@ -61,8 +57,7 @@ class Reflow(Module):
         return self.model.sample(*args, **kwargs)
 
     def forward(self):
-
-        noise = torch.randn((self.batch_size, *self.data_shape), device = self.device)
+        noise = torch.randn((self.batch_size, *self.data_shape), device = self.model.device)
         sampled_output = self.frozen_model.sample(noise = noise)
 
         # the coupling in the paper is (noise, sampled_output)
@@ -82,7 +77,7 @@ class ReflowTrainer(Module):
         learning_rate = 3e-4,
         batch_size = 16,
         checkpoints_folder: str = './checkpoints',
-        results_folder: str = './results',
+        results_folder: str = './.results',
         save_results_every: int = 100,
         checkpoint_every: int = 1000,
         num_samples: int = 16,
@@ -95,7 +90,7 @@ class ReflowTrainer(Module):
 
         assert not rectified_flow.use_consistency, 'reflow is not needed if using consistency flow matching'
 
-        self.model = Reflow(rectified_flow)
+        self.model = Reflow(rectified_flow, batch_size = batch_size)
 
         if self.is_main:
             self.ema_model = EMA(
@@ -106,7 +101,7 @@ class ReflowTrainer(Module):
 
             self.ema_model.to(self.accelerator.device)
 
-        self.optimizer = Adam(rectified_flow.parameters(), lr = learning_rate, **adam_kwargs)
+        self.optimizer = AdamW(rectified_flow.parameters(), lr = learning_rate, **adam_kwargs)
 
         self.model, self.optimizer = self.accelerator.prepare(self.model, self.optimizer)
 
@@ -158,7 +153,7 @@ class ReflowTrainer(Module):
 
             self.model.train()
 
-            loss = self.model(batch_size = self.batch_size)
+            loss = self.model()
 
             self.log(loss, step = step)
 
@@ -193,3 +188,26 @@ class ReflowTrainer(Module):
             self.accelerator.wait_for_everyone()
 
         print('reflow training complete')
+
+def main():
+    model = create_unet()
+
+    rectified_flow = RectifiedFlow(
+        model,
+        loss_fn = 'pseudo_huber',
+        use_consistency = False,
+        data_shape = (3, 64, 64)
+    )
+
+    load_package = torch.load('./checkpoints/rectified_flow.pt', weights_only=True)
+    
+    rectified_flow.load_state_dict(load_package["model"])
+
+    trainer = ReflowTrainer(rectified_flow,
+                            accelerate_kwargs = dict(mixed_precision = 'fp16'),
+                            adam_kwargs = dict(weight_decay = 1e-12))
+
+    trainer()
+
+if __name__ == "__main__":
+    main()
