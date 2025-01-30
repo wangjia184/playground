@@ -4,3 +4,6 @@
 [submodule "dcae/efficientvit"]
 	path = dcae/efficientvit
 	url = https://github.com/mit-han-lab/efficientvit.git
+[submodule "video_gen/LTX-Video"]
+	path = video_gen/LTX-Video
+	url = https://huggingface.co/Lightricks/LTX-Video
