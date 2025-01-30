@@ -7,3 +7,6 @@
 [submodule "video_gen/LTX-Video"]
 	path = video_gen/LTX-Video
 	url = https://huggingface.co/Lightricks/LTX-Video
+[submodule "video_gen/ltx-video-code"]
+	path = video_gen/ltx-video-code
+	url = https://github.com/Lightricks/LTX-Video.git
