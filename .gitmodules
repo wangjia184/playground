@@ -10,9 +10,3 @@
 [submodule "video_gen/ltx-video-code"]
 	path = video_gen/ltx-video-code
 	url = https://github.com/Lightricks/LTX-Video.git
-[submodule "talking_face/whisper-tiny"]
-	path = talking_face/whisper-tiny
-	url = https://huggingface.co/openai/whisper-tiny
-[submodule "talking_face/LatentSync"]
-	path = talking_face/LatentSync
-	url = https://github.com/bytedance/LatentSync.git
