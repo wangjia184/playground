@@ -11,3 +11,4 @@ models
 checkpoints
 /rectified_flow/data
 /rectified_flow/102flowers
+/vqvae/data
