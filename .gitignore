@@ -12,3 +12,5 @@ checkpoints
 /rectified_flow/data
 /rectified_flow/102flowers
 /vqvae/data
+/var/data/
+/var/vae/data
