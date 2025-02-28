@@ -1,4 +1,4 @@
 #!/bin/bash
 
 echo "docker exec var tensorboard --logdir /app/runs"
-./run.sh python /app/vae/train.py
+./run.sh python /app/vqvae/train.py

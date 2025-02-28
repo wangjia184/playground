@@ -10,3 +10,9 @@
 [submodule "video_gen/ltx-video-code"]
 	path = video_gen/ltx-video-code
 	url = https://github.com/Lightricks/LTX-Video.git
+[submodule "var/weights"]
+	path = var/weights
+	url = https://huggingface.co/FoundationVision/var
+[submodule "var/VAR"]
+	path = var/VAR
+	url = https://github.com/FoundationVision/VAR.git
